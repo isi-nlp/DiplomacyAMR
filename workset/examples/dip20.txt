@@ -1,0 +1,24 @@
+# ::type workset ::id dip20 ::username dpeskov ::date Thu Mar 3, 2022
+# ::description Diplomacy ...
+dip_0020.1 Hi germany! Are you up for Sil as a DMZ? It would be in both of our best interests if we didn't get in a fight early on, as bo
+th of our great powers already have a lot to deal with on our sides of the map. Looking forwards to a great game!
+dip_0020.2 Hey Austria! How's it going? I am hoping we can work together on this one. No point getting into any early conflict which will
+ only serve to help everyone else. How do you like to split up the Balkans?
+dip_0020.3 Hi Turkey! I fully agree that we should stay peaceful with eachother. How do you like the sound of you getting Greece and Bulg
+aria and I'll go for Romania and Serbia?
+dip_0020.4 That sounds good. If we stick together we can get through this early game intact. What's your read on Russia and Italy? Have y
+ou heard from them?
+dip_0020.5 Haven't heard from either of them yet unfortunately
+dip_0020.6 Ah well our biggest issue is keeping Russia out of Rumania. I will see if they have plans to move most units south. It sounds
+like they might be.
+dip_0020.7 Russia is planning to take you out as soon as possible, and is asking me to help. How do you feel about moving against Russia,
+ as I believe that he will be the biggest threat to the two of us. He is really posturing in his communications with me
+dip_0020.8 Sure, that makes sense. Like I said, first thing would be to keep Russia out of RUM, whether that be by supporting yours or my
+ army in. Italy is pretty quiet but what I did hear from him was fairly anti Austrian by the way. I believe they are probably pretty tigh
+t with Russia, them being natural allies anyway.
+dip_0020.9 Well I'm getting the same sort of stuff from Russia that you have. They are indicating to me that they will commit south and w
+ant to attack you directly with my help. I have told them I'd consider it but know that I am firmly locked in to working together with yo
+u. Looks like our neighbours have made the decision for us really which makes it easy right?
+dip_0020.10 I'm quite happy to support you going into Romania as I can imagine that I'll need my forces to fend off Italy. Will you be mo
+ving up to Bulgaria this turn and go onto Romania from there?
+dip_0020.11 Ok yes let's do that and I can support you into Greece the following year if you don't get it this year.
