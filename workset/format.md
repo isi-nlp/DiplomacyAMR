@@ -1,6 +1,7 @@
 A **workset ID** for Diplomacy should be of format (in regex): dip[-\_a-zA-Z0-9]+[a-zA-Z0-9]<br>
 The **workset filename** should be the same as the workset ID plus the .txt suffix, e.g. dip24.txt<br>
-A workset file has two meta lines at the top. The first meta line has attributes such as ::type (always workset) ::id, ::username, ::date<br>
+A workset file has two meta lines at the top. The meta lines start with a hashtag and a space ("# ").<br>
+The first meta line has attributes such as ::type (always workset) ::id, ::username, ::date<br>
 The second meta line contains a brief description of the workset (as value of attribute ::description).
 
 A **sentence ID** should be of format (in regex): dip[\_a-zA-Z0-9]+[a-zA-Z0-9]\_\d\d\d\d\.\d+<br>
