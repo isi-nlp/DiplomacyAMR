@@ -386,7 +386,7 @@ def main_test():
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Analyzes a given text for a wide range of anomalies')
+    parser = argparse.ArgumentParser(description='Maps AMR to DAIDE in classical or jsonl format')
     parser.add_argument('-i', '--input', type=Path, metavar='AMR-INPUT-FILENAME')
     parser.add_argument('-o', '--output', type=argparse.FileType('w', encoding='utf-8', errors='ignore'),
                         default=sys.stdout, metavar='OUTPUT-FILENAME', help='(default: STDOUT)')
