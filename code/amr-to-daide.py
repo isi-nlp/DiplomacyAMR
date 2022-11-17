@@ -387,8 +387,7 @@ def main_test():
 
 def main():
     parser = argparse.ArgumentParser(description='Analyzes a given text for a wide range of anomalies')
-    parser.add_argument('-i', '--input', type=Path,
-                        default=sys.stdin, metavar='AMR-INPUT-FILENAME', help='(default: STDIN)')
+    parser.add_argument('-i', '--input', type=Path, metavar='AMR-INPUT-FILENAME')
     parser.add_argument('-o', '--output', type=argparse.FileType('w', encoding='utf-8', errors='ignore'),
                         default=sys.stdout, metavar='OUTPUT-FILENAME', help='(default: STDOUT)')
     parser.add_argument('-j', '--json', type=argparse.FileType('w', encoding='utf-8', errors='ignore'),
