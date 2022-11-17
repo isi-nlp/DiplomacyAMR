@@ -50,7 +50,7 @@ jsonl (json lines) output is 1 json per AMR, each on one separate line, with the
 1. id: AMR sentence ID, as provided in input
 2. snt: English sentence(s), as provided in input
 3. amr: AMR, as provided in input
-4. daide-status: one of No-DAIDE (contains do DAIDE), Partial-DAIDE (contains mix of DAIDE and AMR), or Full-DAIDE
+4. daide-status: one of No-DAIDE (contains no DAIDE), Partial-DAIDE (contains mix of DAIDE and AMR), or Full-DAIDE
 5. daide: any partial or full DAIDE (absent if daide-status is No-DAIDE) 
 
 jsonl output example line:
