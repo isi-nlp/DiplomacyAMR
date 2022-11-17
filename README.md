@@ -10,9 +10,10 @@ AMR-related aspects of Diplomacy ALLAN project
 
 ## amr-to-daide.py
 
-### Usage &nbsp; (click below for details)
+Script to map AMRs (in AMR annotation file format) to DAIDE (in text or jsonl format)
+
 <details>
-<summary>CLI argument structure</summary>
+<summary>Argument structure</summary>
 
 ```
 usage: amr-to-daide.py [-h] [-i AMR-INPUT-FILENAME] [-o OUTPUT-FILENAME] [-j JSONL-OUTPUT-FILENAME] [-m MAX] [-d] [-v]
@@ -33,7 +34,7 @@ options:
 </details>
 
 <details>
-<summary>CLI examples</summary>
+<summary>Examples</summary>
 
 ```
 cd DiplomacyAMR/annotations
