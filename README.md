@@ -34,11 +34,27 @@ options:
 </details>
 
 <details>
-<summary>Examples</summary>
+<summary>CLI examples</summary>
 
 ```
 cd DiplomacyAMR/annotations
 ../code/amr-to-daide.py -i dip-all-amr-smosher.txt --max 10
 ../code/amr-to-daide.py -i dip-all-amr-smosher.txt -o dip-all-amr-daide-smosher.txt -j dip-all-amr-daide-smosher.jsonl
 ``` 
+</details>
+
+<details>
+<summary>jsonl output format</summary>
+jsonl (json lines) output is 1 json per AMR, each on one separate line, with these fields
+
+1. id: AMR sentence ID, as provided in input
+2. snt: English sentence(s), as provided in input
+3. amr: AMR, as provided in input
+4. daide-status: one of No-DAIDE (contains do DAIDE), Partial-DAIDE (contains mix of DAIDE and AMR), or Full-DAIDE
+5. daide: any partial or full DAIDE (absent if daide-status is No-DAIDE) 
+
+jsonl output example line:
+```
+{"id": "dip_0001.1", "snt": "Austria", "amr": "(c / country :name (n / name :op1 \"Austria\"))", "daide-status": "Full-DAIDE", "daide": "AUS"}
+```
 </details>
