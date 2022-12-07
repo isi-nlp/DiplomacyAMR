@@ -71,9 +71,13 @@ class AMR:
             s = pre + value + post
         if self.sub_amr_node_by_role(amr_node, ['polarity']) == '-':
             s = f'NOT ({s})'
+        if self.amr_has_unknown_sub(amr_node):
+            d['warnings'] = self.extend_new_warnings(d.get('warnings', []), ['includes question'])
         while m3 := re.match(r'(.*)\((\([^()]*\))\)(.*)$', s):
             s = m3.group(1) + m3.group(2) + m3.group(3)
-        return s
+        # simplify AUS SUP ((FRA AMY TYR) MTO VEN) -> AUS SUP (FRA AMY TYR) MTO VEN
+        s = re.sub(r'( SUP )\((\([^()]+\))( MTO [A-Z]{3})\)', r'\1\2\3', s)
+        return s, d.get('warnings', [])
 
     def string_to_amr(self, s: str, parent: Optional[AMRnode] = None, rec_level: int = 0) -> \
             Tuple[Optional[AMRnode], str, list[str], Optional[str], Optional[str], Optional[str]]:
@@ -96,7 +100,6 @@ class AMR:
             variable, concept, s = m3.group(1, 2, 3)
             amr_node = AMRnode(concept, parent=parent, variable=variable)
             self.variable_to_amr_node[variable] = amr_node
-            # print(f"{indent}New AMR node: ({variable} / {concept})")
             if self.root is None:
                 self.root = amr_node
             while m_role := re.match(r'\s*:([a-z][a-z0-9]*(?:-[a-z0-9]+)*)(.*)', s, re.DOTALL | re.IGNORECASE):
@@ -108,7 +111,6 @@ class AMR:
                     if sub_amr:
                         amr_node.subs.append((role, sub_amr))
                         sub_amr.parents.append(amr_node)
-                        # print(f"{indent}New AMR sub1: :{role} {sub_amr.variable}/{sub_amr.concept}")
                     else:
                         errors.append(f'Unexpected non-AMR: {s}')
                         return amr_node, s, errors, snt_id, snt, amr_s
@@ -116,13 +118,11 @@ class AMR:
                 elif m_string := re.match(r'\s*"((?:\\"|[^"]+)*)"(.*)', s, re.DOTALL):
                     quoted_string_value, s = m_string.group(1, 2)
                     amr_node.subs.append((role, quoted_string_value))
-                    # print(f'{indent}New AMR sub2: :{role} "{quoted_string_value}"')
                 # sub is reentrancy variable
                 elif m_string := re.match(r'\s*([a-z]\d*)(?![a-z])(.*)', s, re.DOTALL):
                     ref_variable, s = m_string.group(1, 2)
                     if ref_amr := self.variable_to_amr_node.get(ref_variable):
                         amr_node.subs.append((role, ref_amr))
-                        # print(f'{indent}New AMR sub3: :{role} {ref_variable}')
                     else:
                         self.orphan_variables[ref_variable].append((amr_node, len(amr_node.subs)))
                         amr_node.subs.append((role, None))
@@ -130,7 +130,6 @@ class AMR:
                 elif m_string := re.match(r'\s*([^\s()]+)(.*)', s, re.DOTALL):
                     unquoted_string_value, s = m_string.group(1, 2)
                     amr_node.subs.append((role, unquoted_string_value))
-                    # print(f'{indent}New AMR sub4: :{role} {unquoted_string_value}')
                 else:
                     errors.append(f'Unexpected :{role} arg: {s}')
                     return amr_node, s, errors, snt_id, snt, amr_s
@@ -186,8 +185,33 @@ class AMR:
         return None
 
     @staticmethod
+    def amr_has_unknown_sub(amr_node) -> bool:
+        for role, sub in amr_node.subs:
+            try:
+                concept = sub.concept
+            except AttributeError:
+                pass
+            else:
+                if concept == 'amr-unknown':
+                    return True
+        return False
+
+    @staticmethod
+    def sub_amr_concept_by_role(amr_node, roles) -> Optional[str]:
+        for role, sub in amr_node.subs:
+            if role in roles:
+                return sub.concept
+        return None
+
+    @staticmethod
     def parents(amr_node) -> list[AMRnode]:
         return amr_node.parents
+
+    def parent_is_in_concepts(self, amr_node, concepts: list[str]) -> bool:
+        for parent in self.parents(amr_node):
+            if parent.concept in concepts:
+                return True
+        return False
 
     def ancestor_is_in_concepts(self, amr_node, concepts: list[str],
                                 visited_amr_nodes: Optional[list[AMRnode]] = None) -> bool:
@@ -217,6 +241,7 @@ class AMR:
         return ''
 
     def match_for_daide(self, amr_node: AMRnode, target_s: str, in_dict: Optional[dict] = None) -> Optional[dict]:
+        warnings = []
         if m2 := re.match(r'\((\S+)\s+(.*)\)$', target_s):
             result = in_dict or {'match': True}
             concept = amr_node.concept
@@ -230,13 +255,12 @@ class AMR:
                 result[m1.group(1)] = daide.name_to_id.get(concept) or concept
             else:
                 return None
-            for arg_value in regex.findall(r':([a-z][-a-z0-9]*)\s+([^\s()]+|(\((?:[^()]++|(?3))*\))(?:\([^\s()]+\))?)',
+            for arg_value in regex.findall(r':([a-z][-a-z0-9]*)\s+([^\s()]+(?:\([^\s()]+\))?'
+                                           r'|(\((?:[^()]++|(?3))*\))(?:\([^\s()]+\))?)',
                                            m2.group(2), re.IGNORECASE):
                 arg, value = arg_value[0], arg_value[1]
-                # print(f'  arg: {arg}  value: {value}')
                 if sub_amr_node := self.sub_amr_node_by_role(amr_node, [arg]):
                     sub_concept = sub_amr_node.concept
-                    # print(f'    sub_concept: {sub_concept}')
                     if value == sub_concept:
                         pass
                     elif ((m2c := (re.match(r'\$([a-z][a-z0-9]*)\((.*)\)$', value)
@@ -246,7 +270,8 @@ class AMR:
                         if sub_name := self.ne_amr_to_name(sub_amr_node):
                             result[var] = daide.name_to_id.get(sub_name) or sub_name
                         elif sub_amr_node.subs:
-                            result[var] = self.amr_to_daide(sub_amr_node) or sub_concept
+                            result[var], sub_warnings = self.amr_to_daide(sub_amr_node, top=False) or sub_concept
+                            warnings = self.extend_new_warnings(warnings, sub_warnings)
                         else:
                             result[var] = daide.name_to_id.get(sub_concept) or sub_concept
                     elif has_matching_outer_parentheses(value):
@@ -256,65 +281,126 @@ class AMR:
                         return None
                 else:
                     return None
+            result['warnings'] = warnings
             return result
         return None
 
-    def amr_to_daide(self, amr_node: AMRnode = None) -> str:
+    @staticmethod
+    def extend_new_warnings(warnings: list[str], new_warnings: list[str]):
+        for new_warning in new_warnings:
+            if new_warning not in warnings:
+                warnings.append(new_warning)
+        return warnings
+
+    def add_warning_to_match_dict(self, match_dict, warning):
+        match_dict['warnings'] = self.extend_new_warnings(match_dict.get('warnings', []), [warning])
+
+    def amr_to_daide(self, amr_node: AMRnode = None, top: bool = True) -> Tuple[str, list[str]]:
+        # returns pair of (daide_element, warnings)
+        warnings = []
         if amr_node is None:
             amr_node = self.root
         if (entity_name := self.ne_amr_to_name(amr_node)) \
                 and (daide_id := daide.name_to_id.get(entity_name)):
-            return daide_id
+            return daide_id, warnings
         concept = amr_node.concept
         if concept == 'and':
             daide_elements = []
             i = 1
             while op_amr_node := self.sub_amr_node_by_role(amr_node, [f"op{i}"]):
-                if daide_element := self.amr_to_daide(op_amr_node):
+                daide_element, sub_warnings = self.amr_to_daide(op_amr_node, top=False)
+                warnings = self.extend_new_warnings(warnings, sub_warnings)
+                if daide_element:
                     if ' ' in daide_element and not has_matching_outer_parentheses(daide_element):
                         daide_element = '(' + daide_element + ')'
                     daide_elements.append(daide_element)
                     i += 1
-            return ' '.join(daide_elements)
+            if self.parent_is_in_concepts(amr_node, ['ally-01', 'demilitarize-01']):
+                return ' '.join(daide_elements), warnings
+            else:
+                return f"AND {' '.join(daide_elements)}", warnings
         if d := self.match_for_daide(amr_node,
                                      '($utype(army|fleet) :mod $power(country) :location $location(sea|province))'):
             return self.match_map(amr_node, d, '($power $utype $location)')
         if d := self.match_for_daide(amr_node, '(move-01 :ARG1 $unit :ARG2 $destination)'):
+            if top:
+                self.add_warning_to_match_dict(d, 'MTO at top level')
             return self.match_map(amr_node, d, '$unit MTO $destination')
         if d := self.match_for_daide(amr_node, '(coast :location ($compass(north|east|south|west)'
                                                ' :part-of $province(province)))'):
             return self.match_map(amr_node, d, '($province $compass)')
         if d := self.match_for_daide(amr_node, '(hold-03 :ARG1 $unit)'):
+            unit = d.get('unit', '')
+            if top:
+                self.add_warning_to_match_dict(d, 'HLD at top level')
+            if not re.match(r'^\([A-Z]{3} (?:AMY|FLT) ', unit):
+                self.add_warning_to_match_dict(d, f"HLD unit must be a specific unit, not {unit}")
             return self.match_map(amr_node, d, '$unit HLD')
         if d := self.match_for_daide(amr_node, '(support-01 :ARG0 $supporter :ARG1 $supportee)'):
+            supporter = d.get('supporter', '')
+            supportee = d.get('supportee', '')
+            if not re.match(r'^\([A-Z]{3} (?:AMY|FLT) ', supporter):
+                self.add_warning_to_match_dict(d, f"SUP supporter must be a specific unit, not {supporter}")
+            if not re.match(r'^\([A-Z]{3} (?:AMY|FLT) ', supportee):
+                self.add_warning_to_match_dict(d, f"SUP supportee must be a specific unit, not {supportee}")
+            if top:
+                self.add_warning_to_match_dict(d, 'SUP at top level')
             return self.match_map(amr_node, d, '$supporter SUP $supportee')
         if d := self.match_for_daide(amr_node, '(ally-01 :ARG1 $allies :ARG3 $ennemies)'):
+            if top:
+                self.add_warning_to_match_dict(d, 'ALY at top level')
             return self.match_map(amr_node, d, 'ALY ($allies) VSS ($ennemies)')
         if d := self.match_for_daide(amr_node, '(ally-01 :ARG1 $allies)'):
+            self.add_warning_to_match_dict(d, 'ALY without VSS')
+            if top:
+                self.add_warning_to_match_dict(d, 'ALY at top level')
             return self.match_map(amr_node, d, 'ALY ($allies)')
         if d := self.match_for_daide(amr_node, '(submit-01 :ARG1 $submission)'):
             return self.match_map(amr_node, d, 'SUB $submission')
+        if d := self.match_for_daide(amr_node, '(propose-01 :ARG1 $proposal(build-01|hold-03|move-01|remove-01'
+                                               '|retreat-01|support-01|transport-01))'):
+            return self.match_map(amr_node, d, 'PRP (XDO ($proposal))')
         if d := self.match_for_daide(amr_node, '(propose-01 :ARG1 $proposal)'):
             return self.match_map(amr_node, d, 'PRP ($proposal)')
         if d := self.match_for_daide(amr_node, '(build-01 :ARG0 $power(country) :ARG1 $utype(army|fleet) '
                                                ':location $location(province))'):
+            if top:
+                self.add_warning_to_match_dict(d, 'BLD at top level')
             return self.match_map(amr_node, d, '($power $utype $location) BLD')
+        if d := self.match_for_daide(amr_node, '(agree-01 :ARG1 $proposal(build-01|hold-03|move-01|remove-01'
+                                               '|retreat-01|support-01|transport-01))'):
+            return self.match_map(amr_node, d, 'YES (PRP (XDO ($proposal)))')
+        if d := self.match_for_daide(amr_node, '(agree-01 :ARG1 $proposal(ally-01|demilitarize-01|have-03|peace))'):
+            return self.match_map(amr_node, d, 'YES (PRP ($proposal))')
         if d := self.match_for_daide(amr_node, '(agree-01 :ARG1 $proposal)'):
             return self.match_map(amr_node, d, 'YES ($proposal)')
         if d := self.match_for_daide(amr_node, '(reject-01 :ARG1 $proposal)'):
             return self.match_map(amr_node, d, 'REJ ($proposal)')
         if d := self.match_for_daide(amr_node, '(demilitarize-01 :ARG1 $powers :ARG2 $locations)'):
+            for location_id in re.findall(r'[A-Z]+', d.get('locations', '')):
+                if not daide.province_name.get(location_id):
+                    self.add_warning_to_match_dict(d, f"DMZ locations must be provinces, not {location_id}")
+            if top:
+                self.add_warning_to_match_dict(d, 'DMZ at top level')
             return self.match_map(amr_node, d, 'DMZ ($powers) ($locations)')
         if d := self.match_for_daide(amr_node, '(remove-01 :ARG1 $unit(army|fleet))'):
+            if top:
+                self.add_warning_to_match_dict(d, 'REM at top level')
             return self.match_map(amr_node, d, '$unit REM')
         if d := self.match_for_daide(amr_node, '(transport-01 :ARG1 $army(army) :ARG3 $destination(province) '
                                                ':ARG4 $path(sea))'):
+            if top:
+                self.add_warning_to_match_dict(d, 'CTO at top level')
             return self.match_map(amr_node, d, '$army CTO $destination VIA $path')
         if d := self.match_for_daide(amr_node, '(transport-01 :ARG0 $fleet(fleet) :ARG1 $army(army) '
                                                ':ARG3 $destination(province))'):
+            if top:
+                self.add_warning_to_match_dict(d, 'CVY at top level')
             return self.match_map(amr_node, d, '$fleet CVY $army CTO $destination')
         if d := self.match_for_daide(amr_node, '(retreat-01 :ARG1 $unit(army|fleet) '
                                                ':destination $destination(province|sea))'):
+            if top:
+                self.add_warning_to_match_dict(d, 'RTO at top level')
             return self.match_map(amr_node, d, '$unit RTO $destination')
         if (d := self.match_for_daide(amr_node, '(have-03 :ARG0 $owner(country) :ARG1 $province(province))')) \
                 and self.ancestor_is_in_concepts(amr_node, ['propose-01', 'agree-01']):
@@ -322,16 +408,20 @@ class AMR:
         if d := self.match_for_daide(amr_node, '(peace :op1 $c1(country) :op2 $c2(country) :op3 $c3(country))'):
             return self.match_map(amr_node, d, 'PCE ($c1 $c2 $c3)')
         if d := self.match_for_daide(amr_node, '(peace :op1 $c1(country) :op2 $c2(country))'):
+            if top:
+                self.add_warning_to_match_dict(d, 'PCE at top level')
             return self.match_map(amr_node, d, 'PCE ($c1 $c2)')
         result = f'({concept}'
         for role, sub in amr_node.subs:
             result += f" :{role} "
             if isinstance(sub, AMRnode):
-                result += self.amr_to_daide(amr_node=sub)
+                daide_element, sub_warnings = self.amr_to_daide(amr_node=sub, top=False)
+                warnings = self.extend_new_warnings(warnings, sub_warnings)
+                result += daide_element
             elif isinstance(sub, str):
                 result += f'"{sub}"'
         result += ')'
-        return result
+        return result, warnings
 
     @staticmethod
     def file_to_amrs(filename: str, max_n: Optional[int]) -> Tuple[list, list, list, list, list]:
@@ -344,7 +434,6 @@ class AMR:
         snts = []
         errors = []
         amr_strings = []
-        # print("AMR in:", s)
         while re.match(r'\s*\S', s):
             orig_s = s
             amr = AMR()
@@ -421,9 +510,9 @@ def main():
         if amr_s2 == '(a / amr-empty)':
             n_amr_empty += 1
             show_daide_in_dev_mode = False
-            daide_s = ''
+            daide_s, warnings = '', []
         else:
-            daide_s = amr.amr_to_daide()
+            daide_s, warnings = amr.amr_to_daide()
             if extended_amr_concepts := re.findall(r'([a-z]\S*-\d\d\b)', daide_s):
                 if set(extended_amr_concepts1) & set(extended_amr_concepts):
                     n_amr_with_extended_concept1 += 1
@@ -446,6 +535,8 @@ def main():
         if regex.search(r'[A-Z]{3}', daide_s):
             if regex.search(r'[a-z]', daide_s):
                 daide_status = 'Partial-DAIDE'
+            elif warnings:
+                daide_status = 'Para-DAIDE'
             else:
                 daide_status = 'Full-DAIDE'
         else:
@@ -461,6 +552,8 @@ def main():
                 out.write(f'DAIDE: {daide_s}\n')
             elif daide_status == 'Partial-DAIDE':
                 out.write(f'PARTIAL-DAIDE: {daide_s}\n')
+            elif daide_status == 'Para-DAIDE':
+                out.write(f'PARA-DAIDE: {daide_s}\n')
             else:
                 out.write('NO-DAIDE\n')
             out.write('\n')
@@ -468,6 +561,8 @@ def main():
             d = {'id': snt_id, 'snt': snt, 'amr': amr_s.strip(), 'daide-status': daide_status}
             if daide_s:
                 d['daide'] = daide_s
+                if warnings:
+                    d['warnings'] = warnings
             args.json.write(json.dumps(d) + "\n")
         if not daide_problematic:
             n_daide_without_problem += 1
